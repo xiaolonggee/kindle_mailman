@@ -1,5 +1,3 @@
-import { fetch, FormData, Blob } from 'undici';
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const API_BASE = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : null;
 const FILE_BASE = BOT_TOKEN ? `https://api.telegram.org/file/bot${BOT_TOKEN}` : null;
@@ -64,17 +62,21 @@ export async function sendDocument(chatId: number | string, document: DocumentPa
   const buffer =
     typeof document.content === 'string' ? Buffer.from(document.content, 'utf8') : document.content;
 
-  const blob = new Blob([buffer], {
-    type: document.contentType ?? 'application/octet-stream',
-  });
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  const copy = new Uint8Array(arrayBuffer);
+  copy.set(buffer);
 
   // filename is required by Telegram to treat it as a document
-  form.append('document', blob, document.filename);
+  form.append(
+    'document',
+    new Blob([arrayBuffer], { type: document.contentType ?? 'application/octet-stream' }),
+    document.filename,
+  );
 
   const response = await fetch(`${API_BASE}/sendDocument`, {
     method: 'POST',
-    // undici FormData is required here; TS may not narrow BodyInit correctly
-    body: form as unknown as import('undici').BodyInit,
+    // Cast to any to satisfy TS; runtime uses Node 18+ fetch with FormData support
+    body: form as any,
   });
 
   if (!response.ok) {
